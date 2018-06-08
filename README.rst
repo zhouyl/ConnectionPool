@@ -24,6 +24,7 @@ Create a pool
     # via create function
     def create_memcache_client():
         return memcache.Client(['127.0.0.1:11211'])
+
     pool = ConnectionPool(create=create_memcache_client,
                           max_size=10, max_usage=10000, idle=60, ttl=120)
 
