@@ -4,7 +4,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='ConnectionPool',
+    name='connection_pool',
     version='0.0.1',
     description='thread safe connection pool',
     long_description=open('README.rst').read(),
