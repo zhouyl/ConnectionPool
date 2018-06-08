@@ -1,14 +1,7 @@
 ConnectionPool
 ##############
 
-This is a thread-safe connection pool for python
-
-Installation
-============
-
-.. code-block:: bash
-
-    pip install connection_pool
+Thread-safe connection pool for python
 
 Examples
 ========
