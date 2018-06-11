@@ -107,14 +107,14 @@ class ConnectionPool(object):
                 self._lock.wait()  # 等待闲置连接
 
             try:
-                conn = self._pool.get_nowait()  # 从空闲连接池中获取一个
+                wrapped = self._pool.get_nowait()  # 从空闲连接池中获取一个
             except queue.Empty:
-                conn = self._wrapper(self._create())  # 创建新连接
+                wrapped = self._wrapper(self._create())  # 创建新连接
                 self._size += 1
         finally:
             self._lock.release()
 
-        return conn.using()
+        return wrapped.using()
 
     def release(self, conn):
         '''释放一个连接，让连接重回到连接池中
@@ -122,21 +122,21 @@ class ConnectionPool(object):
         当连接使用超过限制/超过限定时间时，连接将被销毁
         '''
         self._lock.acquire()
-        conn = self._wrapper(conn)
+        wrapped = self._wrapper(conn)
 
         try:
-            self._test(conn)
+            self._test(wrapped)
         except Expired:
-            self.destroy(conn)
+            self._destroy(wrapped)
         else:
-            self._pool.put_nowait(conn)
+            self._pool.put_nowait(wrapped)
             self._lock.notifyAll()  # 通知其它线程，有闲置连接可用
         finally:
             self._lock.release()
 
-    def destroy(self, conn):
+    def _destroy(self, wrapped):
         '''销毁一个连接'''
-        self._unwrapper(conn)
+        self._unwrapper(wrapped)
         self._size -= 1
 
     def _wrapper(self, conn):
@@ -151,25 +151,25 @@ class ConnectionPool(object):
 
         return self.__wrappers[_id]
 
-    def _unwrapper(self, conn):
+    def _unwrapper(self, wrapped):
         '''取消对连接的包装'''
-        if not isinstance(conn, WrapperConnection):
+        if not isinstance(wrapped, WrapperConnection):
             return
 
-        _id = id(conn)
-        conn.reset()
-        del conn
+        _id = id(wrapped.connection)
+        wrapped.reset()
+        del wrapped
 
         if _id in self.__wrappers:
             del self.__wrappers[_id]
 
-    def _test(self, conn):
+    def _test(self, wrapped):
         '''测试连接的可用性，当不可用时，抛出 Expired 异常'''
-        if self._max_usage and conn.usage >= self._max_usage:
+        if self._max_usage and wrapped.usage >= self._max_usage:
             raise UsageExceeded('Usage exceeds %d times' % self._max_usage)
 
-        if self._ttl and (conn.created + self._ttl) < time.time():
+        if self._ttl and (wrapped.created + self._ttl) < time.time():
             raise TtlExceeded('TTL exceeds %d secs' % self._ttl)
 
-        if self._idle and (conn.last + self._idle) < time.time():
+        if self._idle and (wrapped.last + self._idle) < time.time():
             raise IdleExceeded('Idle exceeds %d secs' % self._idle)
