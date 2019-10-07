@@ -45,9 +45,11 @@ class WrapperConnection(object):
         self.usage = self.last = self.created = 0
 
     def __enter__(self):
+        print("Entering wrapper")
         return self.connection
 
     def __exit__(self, *exc_info):
+        print("Exiting wrapper")
         self.pool.release(self)
 
 
