@@ -45,11 +45,9 @@ class WrapperConnection(object):
         self.usage = self.last = self.created = 0
 
     def __enter__(self):
-        print("Entering wrapper")
         return self.connection
 
     def __exit__(self, *exc_info):
-        print("Exiting wrapper")
         self.pool.release(self)
 
 
@@ -110,7 +108,10 @@ class ConnectionPool(object):
 
             try:
                 wrapped = self._pool.get_nowait()  # 从空闲连接池中获取一个
-            except queue.Empty:
+                if self._idle and (wrapped.last + self._idle) < time.time():
+                    self._destroy(wrapped)
+                    raise IdleExceeded('Idle exceeds %d secs' % self._idle)
+            except (queue.Empty, IdleExceeded):
                 wrapped = self._wrapper(self._create())  # 创建新连接
                 self._size += 1
         finally:
@@ -172,6 +173,3 @@ class ConnectionPool(object):
 
         if self._ttl and (wrapped.created + self._ttl) < time.time():
             raise TtlExceeded('TTL exceeds %d secs' % self._ttl)
-
-        if self._idle and (wrapped.last + self._idle) < time.time():
-            raise IdleExceeded('Idle exceeds %d secs' % self._idle)
