@@ -8,7 +8,7 @@ Install
 
 .. code-block:: bash
 
-    $ conda install -c jmeppley connectionpool
+    $ pip install connection_pool
 
 
 Examples
@@ -45,4 +45,4 @@ Create a pool
 License
 =======
 
-he MIT License (MIT). Please see License File for more information.
+The MIT License (MIT). Please see License File for more information.

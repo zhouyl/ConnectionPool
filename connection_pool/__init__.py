@@ -94,6 +94,9 @@ class ConnectionPool(object):
         if not hasattr(create, '__call__'):
             raise ValueError('"create" argument is not callable')
 
+        if close is not None and not hasattr(close, '__call__'):
+            raise ValueError('"close" argument is not callable')
+
         self._create = create
         self._close = close
         self._max_size = int(max_size)
