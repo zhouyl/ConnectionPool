@@ -67,20 +67,35 @@ class ConnectionPool(object):
 
     __wrappers = {}
 
-    def __init__(self, create, max_size=10, max_usage=0, ttl=0, idle=60, block=True):
+    def __init__(self, create, close=None, max_size=10, max_usage=0, ttl=0, idle=60, block=True):
         '''初始化参数
 
             create:    必须是一个可 callback 的函数
+                       must be a callback function, creates connection
+            close:     optional callback to close connection
             max_size:  最大连接数，当为 0 的时候则没有限制，不建议设置为 0
+                       the maximum number of connections, 0 is no limit (not recommended)
             max_usage: 连接可使用次数，达到该次数后，连接将被释放/关闭
-            ttl:       连接可使用时间，单位(秒)，当连接使用达到指定时间后，连接将被释放/关闭
+                       the number of times the connection can be used,
+                       after this number of times, the connection will be released/closed
+            ttl:       连接可使用时间，单位(秒)，当连接使用达到指定时间后，
+                       连接将被释放/关闭
+                       connection use time limit (seconds), when reached, the connection
+                       will be released/closed
             idle:      连接空闲时间，单位(秒)，当连接在闲置指定时间后，将被释放/关闭
-            block:     当连接数满的时候，是否阻塞等待连接被释放，输入 False 则在连接池满时会抛出异常
+                       connection idle time (seconds), when reached, the connection
+                       will be released/closed
+            block:     当连接数满的时候，是否阻塞等待连接被释放,
+                       输入 False 则在连接池满时会抛出异常
+                       When the number of connections is full,
+                       whether to block and wait for the connection to be released.
+                       Enter False to throw an exception when the connection pool is full
         '''
         if not hasattr(create, '__call__'):
             raise ValueError('"create" argument is not callable')
 
         self._create = create
+        self._close = close
         self._max_size = int(max_size)
         self._max_usage = int(max_usage)
         self._ttl = int(ttl)
@@ -108,7 +123,10 @@ class ConnectionPool(object):
 
             try:
                 wrapped = self._pool.get_nowait()  # 从空闲连接池中获取一个
-            except queue.Empty:
+                if self._idle and (wrapped.last + self._idle) < time.time():
+                    self._destroy(wrapped)
+                    raise IdleExceeded('Idle exceeds %d secs' % self._idle)
+            except (queue.Empty, IdleExceeded):
                 wrapped = self._wrapper(self._create())  # 创建新连接
                 self._size += 1
         finally:
@@ -136,6 +154,9 @@ class ConnectionPool(object):
 
     def _destroy(self, wrapped):
         '''销毁一个连接'''
+        if self._close:
+            self._close(wrapped.connection)
+
         self._unwrapper(wrapped)
         self._size -= 1
 
@@ -170,6 +191,3 @@ class ConnectionPool(object):
 
         if self._ttl and (wrapped.created + self._ttl) < time.time():
             raise TtlExceeded('TTL exceeds %d secs' % self._ttl)
-
-        if self._idle and (wrapped.last + self._idle) < time.time():
-            raise IdleExceeded('Idle exceeds %d secs' % self._idle)

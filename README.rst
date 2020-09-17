@@ -3,6 +3,14 @@ ConnectionPool
 
 Thread-safe connection pool for python
 
+Install
+=======
+
+.. code-block:: bash
+
+    $ conda install -c jmeppley connectionpool
+
+
 Examples
 ========
 
